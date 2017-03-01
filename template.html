@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<!-- template for electrosafety test by out <odexed@mail.ru> -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Самоподготовка</title>
+
+<script type="text/javascript">
+
+var filedata = '';
+var numquest4 = 0;
+var numquest3 = 0;
+var numquest2 = 0;
+var mode = 'order'; // order/random
+var numround = 10; // question in this round by default
+var myanswers = [];
+var index = 0; // current question (starts from 0)
+var ArrayOfquestions = [];
+var selectedoptions = []; // save answers so that we can get back and change them
+
+function removestartmessage()
+{
+	var mes = document.getElementById('mainid');
+	mes.innerHTML="";
+	document.body.removeChild(mes);
+}
+
+function shuffleArray(array) {
+    for (var i = array.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+    return array;
+}
+
+function debug()
+{
+	var divdbg = document.createElement('div');
+	divdbg.id = "debugdiv";
+	document.body.appendChild(divdbg);
+	var dbg = document.createElement('p');
+	dbg.innerHTML=filedata;
+	divdbg.appendChild(dbg);
+}
+
+function updatestats()
+{
+	if (filedata)
+	{
+		var group4c = filedata.match(/^\d+\./gmi);
+		if (group4c)
+		{
+			group4c = group4c.length;
+		}
+		numquest4=group4c;
+		var trim4 = filedata.replace(/Группа\s4([\s\S]+?)(Тема\s\d+|$)/gi,"$2");
+		var group3c = trim4.match(/^\d+\./gmi);
+		if (group3c)
+		{
+			group3c = group3c.length;
+		}
+		numquest3=group3c;
+		
+		var trim3 = trim4.replace(/Группа\s3([\s\S]+?)(Тема\s\d+|$)/gi,"$2");
+
+		var group2c = trim3.match(/^\d+\./gmi);
+		if (group2c)
+		{
+			//alert(group2c);
+			group2c = group2c.length;
+		}
+		numquest2=group2c;
+		// display the number of questions for each group
+		var aa2 = document.getElementsByTagName("a");
+		for (var i=0; i<aa2.length; i++)
+		{
+			if (aa2[i].id == 'href1') { aa2[i].innerHTML = aa2[i].innerHTML.slice(0,-4) + " Всего вопросов: " + numquest2 + "<br>"; }
+			if (aa2[i].id == 'href2') { aa2[i].innerHTML = aa2[i].innerHTML.slice(0,-4) + " Всего вопросов: " + numquest3 + "<br>"; }
+			if (aa2[i].id == 'href3') { aa2[i].innerHTML = aa2[i].innerHTML.slice(0,-4) + " Всего вопросов: " + numquest4 + "<br>"; }
+		}
+		
+	}
+}
+
+function setmodevarsbeforestart() {
+	var questionscnt = document.getElementsByTagName('option');
+	for (var i = 0; i<questionscnt.length; i++) 
+	{
+		if (questionscnt[i].selected) {
+			if (questionscnt[i].parentElement.name == 'menusel')
+			{
+				if (questionscnt[i].innerHTML == 'Вопросы по порядку')
+				{
+					mode='order';
+				} // new 2017
+				else if (questionscnt[i].innerHTML == 'Вопросы в случайном порядке') {
+					mode='random';
+				}
+				else {
+					mode='training';
+				}
+			}
+			if (questionscnt[i].parentElement.name == 'howmanyquest')
+			{
+				numround=questionscnt[i].innerHTML;
+			}
+		}
+	}
+}
+
+function readSingleFile(evt) {
+	var f = evt.target.files[0];
+	
+	if (f) {
+		var r = new FileReader();
+		r.onloadend = function(e) {
+			var contents = e.target.result;
+			filedata=contents;
+			updatestats();
+		}
+		r.readAsText(f);
+	}
+	else {
+		alert("Не удалось загрузить файл");
+	}
+}
+
+function removeoldquestion()
+{
+	var quest = document.getElementById('divquest');
+	if (quest) { 
+		quest.innerHTML="";
+		document.body.removeChild(quest);
+	}
+	var options = document.getElementById('questiontable');
+	if (options)
+	{
+		options.innerHTML="";
+	}
+	var answdiv = document.getElementById('divanswer');
+	if (answdiv) {
+		answdiv.innerHTML="";
+		document.body.removeChild(answdiv);
+	}
+	var buttn = document.getElementById('Next');
+	if (buttn) {
+		document.body.removeChild(buttn);
+	}
+	var divnav = document.getElementById('divnavig');
+	if (divnav) {
+		document.body.removeChild(divnav);
+	}
+	var brid = document.getElementById('brid');
+	if (brid) {
+		document.body.removeChild(brid);
+	}
+}
+
+function displayresults()
+{
+	removeoldquestion();
+	var divres = document.createElement('div');
+	var restext = document.createElement('p');
+	divres.align="center";
+	restext.style.textAlign = "center";
+	restext.setAttribute('class','cnt');
+	var sum = 0;
+	
+	for (var i = 0; i< myanswers.length; i++)
+	{
+		sum = sum + myanswers[i];
+	}
+	restext.innerHTML="Ваш результат: " + sum + "/" + numround;
+	document.body.appendChild(divres);
+	divres.appendChild(restext);
+	
+	// display all the answers in detail
+	for (var i = 0; i < numround; i++)
+	{
+		index = i;
+		displaythequestion(ArrayOfquestions[i+1], true);
+	}
+}
+
+function displaythequestion(currentQuestion, isdebug)
+{
+	isdebug = isdebug || false;
+	if (!isdebug) {
+		if (index >= numround) { 
+			displayresults();
+			return;  // let's get to the results
+		}
+	}
+	var divquest = document.createElement('div');
+	divquest.id = "divquest";
+	var dispquest = document.createElement('p');
+	divquest.align="center";
+	currentQuestion = currentQuestion.replace(/^(Группа\s\d.*?)$/gmi,""); // new 2017
+
+	var getquest = currentQuestion.replace(/(^[-+]|подсказка:)[\s\S]+?$/gim,"").trim();
+	var hint = currentQuestion.match(/подсказка:[\s\S]+?$/gim);
+	var opciones = currentQuestion.replace(getquest,"").replace(hint,"").trim();
+	opciones = opciones.match(/\W[\s\S]+?$/gim);
+	divquest.setAttribute('class','top-right-text');
+	divquest.innerHTML=(index+1) + ". " + getquest; // display the question in the main div
+	divquest.appendChild(dispquest);
+	var br = document.createElement('br');
+	br.id = "brid";
+	if (!isdebug) {
+		// top block with the list of questions
+		var divnavigator = document.createElement('div'); // top block div
+		divnavigator.id="divnavig";
+		divnavigator.setAttribute('class','navigation');
+		document.body.appendChild(divnavigator);
+		var listnumquestions = document.createElement('span');
+		listnumquestions.style='float: left; margin-right: 6px;';
+		listnumquestions.setAttribute('class','navigationtext');
+		// get the string of the numbers of the questions
+		var temp = [];
+		for (var i = 1; i<=numround; i++)
+		{
+			// underline the indexes of questions that we answered
+			if (i < index+1)
+			{
+				temp[i-1]= "<answeredopt>" + i + "</answeredopt>";
+				continue;
+			}
+			temp[i-1]=i;
+		}
+
+		listnumquestions.innerHTML = 'Вопросы: <br>' + temp.join(" ");
+		divnavigator.appendChild(listnumquestions);
+	}
+	document.body.appendChild(br);
+	document.body.appendChild(divquest);
+
+	// display the options in a table
+	var questtable = document.createElement('table');
+	questtable.id='questiontable';
+	questtable.setAttribute('class','form-table');
+	var tbody = document.createElement('tbody');
+	var tr = [];
+	var tdch = [];
+	var tdansw = [];
+	var inputch = [];
+	questtable.appendChild(tbody);
+	for (var i = 0; i<opciones.length; i++)
+	{
+		
+		tr[i]=document.createElement('tr');
+		tdch[i]=document.createElement('td');
+		tdansw[i]=document.createElement('td');
+		
+		tdansw[i].innerHTML=opciones[i].replace(/\s{0,}\W/,"");
+		inputch[i]=document.createElement('input');
+		inputch[i].type='radio';
+		inputch[i].name='Answers';
+		
+		if (opciones[i].match(/^\s{0,}\+/))
+		{
+			inputch[i].setAttribute('iscorrect',1);
+			if (isdebug) {
+				tr[i].setAttribute('class','resultcorrecttr');
+			}
+		}
+		else 
+		{
+			inputch[i].setAttribute('iscorrect',0);
+			// new 2017
+			if (isdebug || mode=='training')
+			{
+				//alert(selectedoptions);
+				if (selectedoptions[index] == i)
+				{
+					tr[i].setAttribute('class','resultincorrecttr');
+				}
+			}
+		}
+		inputch[i].value=i;
+	
+		tbody.appendChild(tr[i]);
+		tr[i].appendChild(tdch[i]);
+		tdch[i].appendChild(inputch[i]);
+		tr[i].appendChild(tdansw[i]);
+	}
+	
+	var divnanswers = document.createElement('div');
+	divnanswers.id='divanswer';
+	divnanswers.appendChild(questtable);
+	document.body.appendChild(divnanswers);
+	if (!isdebug) {
+		// the button
+		var nbutton = document.createElement('button');
+		nbutton.id="Next";
+		nbutton.innerHTML="Ответить";
+		nbutton.name="answerNext";
+		nbutton.onclick = function() {
+			for (var i = 0; i<opciones.length; i++)
+			{
+				if (inputch[i].checked) {
+					if (inputch[i].getAttribute('iscorrect') == 1)
+					{
+						selectedoptions[index]=i; // save the answer we set
+						myanswers[index]=1; // 1 is correct
+						
+						index=index+1;
+						// new 2017
+						// here we already know the correct answer
+						if (mode == 'training') {
+							// display correct answer and your answer
+							tr[i].setAttribute('class','resultcorrecttr');
+
+							// make a button for the next question
+							nbutton.innerHTML = "Следующий вопрос";
+							nbutton.onclick = function() {
+								removeoldquestion();
+								displaythequestion(ArrayOfquestions[index+1]);
+							}
+							return;
+						}
+						
+						
+						removeoldquestion();
+						displaythequestion(ArrayOfquestions[index+1]);
+						return;
+					}
+					else {
+						selectedoptions[index]=i;
+						// new 2017
+						if (mode == 'training') {
+							// if your answer isn't correct
+							myanswers[index]=0;
+							tr[i].setAttribute('class','resultincorrecttr');
+							// find and mark the correct one
+							for (var j = 0; j<opciones.length; j++) {
+								if (inputch[j].getAttribute('iscorrect') == 1)
+								{
+									tr[j].setAttribute('class','resultcorrecttr');
+								}
+							}
+							// make a button for the next answer
+							nbutton.innerHTML = "Следующий вопрос";
+							
+							nbutton.onclick = function() {
+								index=index+1;
+								removeoldquestion();
+								displaythequestion(ArrayOfquestions[index+1]);
+							}
+							return;
+						}
+					}
+				}
+			}
+			
+			myanswers[index]=0; // 0 is incorrect
+			index=index+1;
+			removeoldquestion();
+			displaythequestion(ArrayOfquestions[index+1]);
+		}
+		document.body.appendChild(nbutton);
+	}
+}
+
+function stripgroupandthemescaptions(mtext)
+{
+	var trimg = mtext.replace(/^(Группа\s\d.+?)$/gi,"")
+	var trimth = trimg.replace(/^(Тема\s\d+.?)$/gi,"")
+	return trimth;
+}
+
+function group2()
+{
+	if (!filedata) {
+		alert("Файл с данными не выбран. Загрузите файл и перейдите в нужный раздел."); 
+	}
+	else {
+		setmodevarsbeforestart();
+		removestartmessage();
+		// trim all the questions we don't need
+		// trim the group 4
+		var trim4 = filedata.replace(/Группа\s4([\s\S]+?)(Тема\s\d+|$)/gi,"$2");
+		// trim the group 3
+		var trim3 = trim4.replace(/Группа\s3([\s\S]+?)(Тема\s\d+|$)/gi,"$2");
+		filedata=trim3;
+		ArrayOfquestions = filedata.split(/^\d+\.\s/gmi);
+		//alert(ArrayOfquestions[1]);
+		//alert(ArrayOfquestions.length);
+		if (numround == "ВСЕ")
+		{
+			numround=numquest2;
+		}
+		if (mode == 'random')
+		{
+			ArrayOfquestions = shuffleArray(ArrayOfquestions);
+		}
+		// new 2017
+		if (mode == 'training')
+		{
+			ArrayOfquestions = shuffleArray(ArrayOfquestions);
+			//index=0;
+			//displayOnebyOnequestion(ArrayOfquestions);
+			//return;
+		}
+		// the round starts here
+		index=0;
+		displaythequestion(ArrayOfquestions[index+1]);
+	}
+
+}
+function group3()
+{
+	if (!filedata) { 
+		alert("Файл с данными не выбран. Загрузите файл и перейдите в нужный раздел."); 
+	}
+	else {
+		setmodevarsbeforestart();
+		removestartmessage();
+		// trim all the questions we don't need
+		// trim the group 4
+		var trim4 = filedata.replace(/Группа\s4([\s\S]+?)(Тема\s\d+|$)/gi,"$2");
+		filedata=trim4;
+		filedata=stripgroupandthemescaptions(filedata); // new 2017
+		ArrayOfquestions = filedata.split(/^\d+\.\s/gmi);
+		if (numround == "ВСЕ")
+		{
+			numround=numquest3;
+		}
+		if (mode == 'random')
+		{
+			ArrayOfquestions = shuffleArray(ArrayOfquestions);
+		}
+		// the round starts here
+		index=0;
+		displaythequestion(ArrayOfquestions[index+1]);
+	}
+}
+function group4()
+{
+	if (!filedata) { 
+		alert("Файл с данными не выбран. Загрузите файл и перейдите в нужный раздел."); 
+	}
+	else {
+		setmodevarsbeforestart();
+		removestartmessage();
+		// we don't need to trim anything so just get the array of questions
+		ArrayOfquestions = filedata.split(/^\d+\.\s/gmi);
+		if (numround == "ВСЕ")
+		{
+			numround=numquest4;
+		}
+		if (mode == 'random')
+		{
+			ArrayOfquestions = shuffleArray(ArrayOfquestions);
+		}
+		// the round starts here
+		index=0;
+		displaythequestion(ArrayOfquestions[index+1]);
+	}
+}
+
+function startmessage()
+{
+	// if start message block already exists we don't print the same message again
+	if (document.getElementById('mainid'))
+	{
+		return;
+	}
+	var p2 = document.createElement('p');
+	var br = document.createElement('br');
+	var br2 = document.createElement('br');
+	var br3 = document.createElement('br');
+	var mdiv = document.createElement('div');
+	// for reading a basefile
+	var inp = document.createElement('input');
+	inp.type = "file";
+	inp.id = "fileinput";
+	inp.setAttribute('class','cnt');
+	inp.addEventListener('change', readSingleFile, false);
+	
+	mdiv.id="mainid";
+	p2.innerHTML='Выберите группу для тестирования.';
+	p2.style.textAlign = "center";
+	p2.setAttribute('class','cnt');
+	p2.setAttribute('id','labelchosegroup');
+	var a1 = document.createElement('a');
+	a1.setAttribute('href',"javascript:group2();");
+	a1.innerHTML='Обучение и проверка знаний электротехнического и электротехнологического персонала по электробезопасности (II группа допуска)<br>';
+	a1.setAttribute('class','cnt');
+	a1.setAttribute('id','href1');
+	var a2 = a1.cloneNode(true);
+	a2.setAttribute('href',"javascript:group3();");
+	a2.innerHTML='Обучение и проверка знаний электротехнического и электротехнологического персонала по электробезопасности (III группа допуска)<br>';
+	a2.setAttribute('id','href2');
+	var a3 = a2.cloneNode(true);
+	a3.setAttribute('href',"javascript:group4();");
+	a3.innerHTML='Обучение и проверка знаний электротехнического и электротехнологического персонала по электробезопасности (IV группа допуска)<br>';
+	a3.setAttribute('id','href3');
+	document.body.appendChild(mdiv);
+	
+	var p4 = document.createElement('p');
+	p4.innerHTML='Выберите файл с данными electrosafety.txt';
+	p4.style.textAlign = "center";
+	p4.setAttribute('class','cnt');
+	var br4 = document.createElement('br');
+	mdiv.appendChild(br4);
+	mdiv.appendChild(p4);
+	mdiv.appendChild(inp);
+	
+	mdiv.appendChild(p2);
+	mdiv.appendChild(br);
+	mdiv.appendChild(a1);
+	mdiv.appendChild(br2);
+	mdiv.appendChild(a2);
+	mdiv.appendChild(br3);
+	mdiv.appendChild(a3);
+	
+	var p5 = document.createElement('p');
+	p5.innerHTML='Задайте настройки тестирования';
+	p5.style.textAlign = "center";
+	p5.setAttribute('class','cnt');	
+	mdiv.appendChild(p5);
+	var br5 = document.createElement('br');
+	mdiv.appendChild(br5);
+	
+	var dtl = document.createElement("select");
+	dtl.name='menusel';
+	//dt1.innerHTML="<option value="1">item1</option>"
+	var op1 = document.createElement("option");
+	op1.value="1";
+	op1.innerHTML='Вопросы по порядку';
+	var op2 = document.createElement("option");
+	op2.value="2";
+	op2.innerHTML='Вопросы в случайном порядке';
+	mdiv.appendChild(dtl);
+	dtl.appendChild(op1);
+	dtl.appendChild(op2);
+	// new 2017
+	var op3 = document.createElement("option");
+	op3.value="3";
+	op3.innerHTML='Тренировка (Вопрос-ответ)';
+	dtl.appendChild(op3);
+	// --------
+	var br6 = document.createElement('br');
+	var p6 = document.createElement('p');
+	p6.innerHTML='Количество вопросов';
+	mdiv.appendChild(br6);
+	mdiv.appendChild(p6);
+	var dt2 = document.createElement("select");
+	dt2.name='howmanyquest';
+	var opq1 = document.createElement("option");
+	opq1.value="1";
+	opq1.innerHTML='10';	
+	var opq2 = document.createElement("option");
+	opq2.value="2";
+	opq2.innerHTML='50';
+	var opq3 = document.createElement("option");	
+	opq3.value="3";
+	opq3.innerHTML='100';
+	var opq4 = document.createElement("option");	
+	opq4.value="4";
+	opq4.innerHTML='ВСЕ';
+	mdiv.appendChild(dt2);
+	dt2.appendChild(opq1);
+	dt2.appendChild(opq2);
+	dt2.appendChild(opq3);
+	dt2.appendChild(opq4);
+	
+}
+
+</script>
+<style type="text/css">
+ div.top-right-text {
+	position: relative; font-size:18px; color: #00529c; z-index: -1000; 
+ }
+ .cnt {
+	position: right; font-size:18px; z-index: -1000; 
+ }
+.navigation {
+    background: url(./files/nbg.gif) repeat-x left top;
+	height: 140px;
+    font-size: 14px;
+    color: #fff;
+    border: solid 1px #2a7cc2;
+    margin-top: -1px;
+}
+.navigationtext {
+	font-size: 14px;
+	color: #fff;
+	font-family: Calibri, sans-serif;
+	padding: 7px 10px;
+}
+.navigation-active {
+    font-weight: bold;
+    text-decoration: underline;
+}
+.form-table {
+    border-bottom: solid 1px #e7e7e7;
+    text-align: left;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+answeredopt {
+	text-decoration: line-through;
+}
+.resultcorrecttr {
+	background-color: lime;
+}
+.resultincorrecttr {
+	background-color: red;
+}
+ </style>
+</head>
+<body onload="startmessage();">
+    <noscript>
+        &lt;div class="error-message no-feature-message" style="width: 400px; margin-left: -200px;"&gt;&lt;b&gt;Отключен JavaScript.&lt;/b&gt; Для корректной работы системы необходимо разрешить выполнение сценариев в настройках браузера и обновить страницу.&lt;/div&gt;
+    </noscript>
+	
+	<table cellpadding="0" cellspacing="0"><tbody><tr><td width="50%">
+	<a href="javascript:window.location.href=window.location.href"><img src="./files/logo.gif" alt="К началу"></a></td>
+			<td><h1>Тест по электробезопасности</h1></td></tr>	
+	</tbody></table>
+</body>
+</html>
